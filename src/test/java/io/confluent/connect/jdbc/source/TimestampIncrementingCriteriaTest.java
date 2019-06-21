@@ -83,7 +83,7 @@ public class TimestampIncrementingCriteriaTest {
       criteria = this.criteria;
     }
     TimestampIncrementingOffset offset = criteria.extractValues(schema, record, null);
-    assertEquals(expected, offset.getIncrementingOffset());
+    assertEquals(expected, offset.getIncrementingOffset().value());
   }
 
   @Test
@@ -139,7 +139,7 @@ public class TimestampIncrementingCriteriaTest {
   @Test
   public void createIncrementingWhereClause() {
     builder = builder();
-    criteriaInc.incrementingWhereClause(builder);
+    criteriaInc.incrementingWhereClause(builder, false);
     assertEquals(
         " WHERE \"myTable\".\"id\" > ? ORDER BY \"myTable\".\"id\" ASC",
         builder.toString()
@@ -147,7 +147,7 @@ public class TimestampIncrementingCriteriaTest {
 
     identifierQuoting = QuoteMethod.NEVER;
     builder = builder();
-    criteriaInc.incrementingWhereClause(builder);
+    criteriaInc.incrementingWhereClause(builder, false);
     assertEquals(
         " WHERE myTable.id > ? ORDER BY myTable.id ASC",
         builder.toString()
@@ -157,7 +157,7 @@ public class TimestampIncrementingCriteriaTest {
   @Test
   public void createTimestampWhereClause() {
     builder = builder();
-    criteriaTs.timestampWhereClause(builder);
+    criteriaTs.timestampWhereClause(builder, false);
     assertEquals(
         " WHERE "
         + "COALESCE(\"myTable\".\"ts1\",\"myTable\".\"ts2\") > ? "
@@ -171,7 +171,7 @@ public class TimestampIncrementingCriteriaTest {
 
     identifierQuoting = QuoteMethod.NEVER;
     builder = builder();
-    criteriaTs.timestampWhereClause(builder);
+    criteriaTs.timestampWhereClause(builder, false);
     assertEquals(
         " WHERE "
         + "COALESCE(myTable.ts1,myTable.ts2) > ? "
@@ -187,7 +187,7 @@ public class TimestampIncrementingCriteriaTest {
   @Test
   public void createTimestampIncrementingWhereClause() {
     builder = builder();
-    criteriaIncTs.timestampIncrementingWhereClause(builder);
+    criteriaIncTs.timestampIncrementingWhereClause(builder, false);
     assertEquals(
         " WHERE "
         + "COALESCE(\"myTable\".\"ts1\",\"myTable\".\"ts2\") < ? "
@@ -202,7 +202,7 @@ public class TimestampIncrementingCriteriaTest {
 
     identifierQuoting = QuoteMethod.NEVER;
     builder = builder();
-    criteriaIncTs.timestampIncrementingWhereClause(builder);
+    criteriaIncTs.timestampIncrementingWhereClause(builder, false);
     assertEquals(
         " WHERE "
         + "COALESCE(myTable.ts1,myTable.ts2) < ? "

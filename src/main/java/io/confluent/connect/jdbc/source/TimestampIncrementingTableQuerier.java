@@ -15,6 +15,7 @@
 
 package io.confluent.connect.jdbc.source;
 
+import java.sql.*;
 import java.util.TimeZone;
 import org.apache.kafka.connect.data.Struct;
 import org.apache.kafka.connect.errors.ConnectException;
@@ -23,10 +24,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
-import java.sql.Connection;
-import java.sql.ResultSet;
-import java.sql.SQLException;
-import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -71,6 +68,7 @@ public class TimestampIncrementingTableQuerier extends TableQuerier implements C
   private final Map<String, String> partition;
   private final String topic;
   private final TimeZone timeZone;
+  private boolean first = true;
 
   public TimestampIncrementingTableQuerier(DatabaseDialect dialect, QueryMode mode, String name,
                                            String topicPrefix,
@@ -84,6 +82,9 @@ public class TimestampIncrementingTableQuerier extends TableQuerier implements C
                                 ? timestampColumnNames : Collections.<String>emptyList();
     this.timestampDelay = timestampDelay;
     this.offset = TimestampIncrementingOffset.fromMap(offsetMap);
+    if (offsetMap != null && !offsetMap.isEmpty()) {
+      first = false;
+    }
 
     this.timestampColumns = new ArrayList<>();
     for (String timestampColumn : this.timestampColumnNames) {
@@ -134,7 +135,7 @@ public class TimestampIncrementingTableQuerier extends TableQuerier implements C
 
     // Append the criteria using the columns ...
     criteria = dialect.criteriaFor(incrementingColumn, timestampColumns);
-    criteria.whereClause(builder);
+    criteria.whereClause(builder, first);
 
     String queryString = builder.toString();
     recordQuery(queryString);
@@ -173,8 +174,14 @@ public class TimestampIncrementingTableQuerier extends TableQuerier implements C
 
   @Override
   protected ResultSet executeQuery() throws SQLException {
-    criteria.setQueryParameters(stmt, this);
-    return stmt.executeQuery();
+    if (!first) {
+      criteria.setQueryParameters(stmt, this);
+    }
+    ResultSet resultSet = stmt.executeQuery();
+    if (first) {
+      first = false;
+    }
+    return resultSet;
   }
 
   @Override
@@ -208,7 +215,7 @@ public class TimestampIncrementingTableQuerier extends TableQuerier implements C
   }
 
   @Override
-  public Long lastIncrementedValue() {
+  public IncrementalValue lastIncrementedValue() {
     return offset.getIncrementingOffset();
   }
 
@@ -222,6 +229,7 @@ public class TimestampIncrementingTableQuerier extends TableQuerier implements C
                                         ? incrementingColumnName
                                         : "") + '\''
            + ", timestampColumns=" + timestampColumnNames
+           + ", query=" + stmt
            + '}';
   }
 }

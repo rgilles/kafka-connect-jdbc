@@ -15,6 +15,7 @@
 
 package io.confluent.connect.jdbc.source;
 
+import java.nio.ByteBuffer;
 import java.util.TimeZone;
 import org.apache.kafka.connect.data.Decimal;
 import org.apache.kafka.connect.data.Schema;
@@ -63,7 +64,7 @@ public class TimestampIncrementingCriteria {
      * @return the last incremented value from one of the rows
      * @throws SQLException if there is a problem accessing the value
      */
-    Long lastIncrementedValue() throws SQLException;
+    IncrementalValue lastIncrementedValue() throws SQLException;
   }
 
   protected static final BigDecimal LONG_MAX_VALUE_AS_BIGDEC = new BigDecimal(Long.MAX_VALUE);
@@ -98,19 +99,19 @@ public class TimestampIncrementingCriteria {
    *
    * @param builder the string builder to which the WHERE clause should be appended; never null
    */
-  public void whereClause(ExpressionBuilder builder) {
+  public void whereClause(ExpressionBuilder builder, boolean first) {
     if (hasTimestampColumns() && hasIncrementedColumn()) {
-      timestampIncrementingWhereClause(builder);
+      timestampIncrementingWhereClause(builder, first);
     } else if (hasTimestampColumns()) {
-      timestampWhereClause(builder);
+      timestampWhereClause(builder, first);
     } else if (hasIncrementedColumn()) {
-      incrementingWhereClause(builder);
+      incrementingWhereClause(builder, first);
     }
   }
 
   /**
    * Set the query parameters on the prepared statement whose WHERE clause was generated with the
-   * previous call to {@link #whereClause(ExpressionBuilder)}.
+   * previous call to {@link #whereClause(ExpressionBuilder, boolean)}.
    *
    * @param stmt   the prepared statement; never null
    * @param values the values that can be used in the criteria parameters; never null
@@ -135,10 +136,10 @@ public class TimestampIncrementingCriteria {
   ) throws SQLException {
     Timestamp beginTime = values.beginTimetampValue();
     Timestamp endTime = values.endTimetampValue();
-    Long incOffset = values.lastIncrementedValue();
+    IncrementalValue incOffset = values.lastIncrementedValue();
     stmt.setTimestamp(1, endTime, DateTimeUtils.getTimeZoneCalendar(timeZone));
     stmt.setTimestamp(2, beginTime, DateTimeUtils.getTimeZoneCalendar(timeZone));
-    stmt.setLong(3, incOffset);
+    incOffset.set(stmt, 3);
     stmt.setTimestamp(4, beginTime, DateTimeUtils.getTimeZoneCalendar(timeZone));
     log.debug(
         "Executing prepared statement with start time value = {} end time = {} and incrementing"
@@ -151,8 +152,8 @@ public class TimestampIncrementingCriteria {
       PreparedStatement stmt,
       CriteriaValues values
   ) throws SQLException {
-    Long incOffset = values.lastIncrementedValue();
-    stmt.setLong(1, incOffset);
+    IncrementalValue incOffset = values.lastIncrementedValue();
+    incOffset.set(stmt, 1);
     log.debug("Executing prepared statement with incrementing value = {}", incOffset);
   }
 
@@ -190,15 +191,11 @@ public class TimestampIncrementingCriteria {
           extractedTimestamp) <= 0
       );
     }
-    Long extractedId = null;
+    IncrementalValue extractedId = null;
     if (hasIncrementedColumn()) {
       extractedId = extractOffsetIncrementedId(schema, record);
-
-      // If we are only using an incrementing column, then this must be incrementing.
-      // If we are also using a timestamp, then we may see updates to older rows.
-      assert previousOffset == null || previousOffset.getIncrementingOffset() == -1L
-             || extractedId > previousOffset.getIncrementingOffset() || hasTimestampColumns();
     }
+
     return new TimestampIncrementingOffset(extractedTimestamp, extractedId);
   }
 
@@ -229,21 +226,23 @@ public class TimestampIncrementingCriteria {
    * @param record the record's struct; never null
    * @return the incrementing ID for this row; may not be null
    */
-  protected Long extractOffsetIncrementedId(
+  protected IncrementalValue extractOffsetIncrementedId(
       Schema schema,
       Struct record
   ) {
-    final Long extractedId;
+    final IncrementalValue extractedId;
     final Schema incrementingColumnSchema = schema.field(incrementingColumn.name()).schema();
     final Object incrementingColumnValue = record.get(incrementingColumn.name());
     if (incrementingColumnValue == null) {
       throw new ConnectException(
           "Null value for incrementing column of type: " + incrementingColumnSchema.type());
     } else if (isIntegralPrimitiveType(incrementingColumnValue)) {
-      extractedId = ((Number) incrementingColumnValue).longValue();
+      extractedId = IncrementalValue.of(((Number) incrementingColumnValue).longValue());
     } else if (incrementingColumnSchema.name() != null && incrementingColumnSchema.name().equals(
         Decimal.LOGICAL_NAME)) {
-      extractedId = extractDecimalId(incrementingColumnValue);
+      extractedId = IncrementalValue.of(extractDecimalId(incrementingColumnValue));
+    } else if (incrementingColumnSchema.type() == Schema.Type.BYTES) {
+      extractedId = IncrementalValue.of((byte[]) incrementingColumnValue);
     } else {
       throw new ConnectException(
           "Invalid type for incrementing column: " + incrementingColumnSchema.type());
@@ -279,7 +278,7 @@ public class TimestampIncrementingCriteria {
     return builder.toString();
   }
 
-  protected void timestampIncrementingWhereClause(ExpressionBuilder builder) {
+  protected void timestampIncrementingWhereClause(ExpressionBuilder builder, boolean first) {
     // This version combines two possible conditions. The first checks timestamp == last
     // timestamp and incrementing > last incrementing. The timestamp alone would include
     // duplicates, but adding the incrementing condition ensures no duplicates, e.g. you would
@@ -293,16 +292,18 @@ public class TimestampIncrementingCriteria {
     //  timestamp 1235, id 22
     //  timestamp 1236, id 23
     // We should capture both id = 22 (an update) and id = 23 (a new row)
-    builder.append(" WHERE ");
-    coalesceTimestampColumns(builder);
-    builder.append(" < ? AND ((");
-    coalesceTimestampColumns(builder);
-    builder.append(" = ? AND ");
-    builder.append(incrementingColumn);
-    builder.append(" > ?");
-    builder.append(") OR ");
-    coalesceTimestampColumns(builder);
-    builder.append(" > ?)");
+    if (!first) {
+      builder.append(" WHERE ");
+      coalesceTimestampColumns(builder);
+      builder.append(" < ? AND ((");
+      coalesceTimestampColumns(builder);
+      builder.append(" = ? AND ");
+      builder.append(incrementingColumn);
+      builder.append(" > ?");
+      builder.append(") OR ");
+      coalesceTimestampColumns(builder);
+      builder.append(" > ?)");
+    }
     builder.append(" ORDER BY ");
     coalesceTimestampColumns(builder);
     builder.append(",");
@@ -310,21 +311,26 @@ public class TimestampIncrementingCriteria {
     builder.append(" ASC");
   }
 
-  protected void incrementingWhereClause(ExpressionBuilder builder) {
-    builder.append(" WHERE ");
-    builder.append(incrementingColumn);
-    builder.append(" > ?");
+  protected void incrementingWhereClause(ExpressionBuilder builder, boolean first) {
+    if (!first) {
+      builder.append(" WHERE ");
+      builder.append(incrementingColumn);
+      builder.append(" > ?");
+    }
     builder.append(" ORDER BY ");
     builder.append(incrementingColumn);
     builder.append(" ASC");
   }
 
-  protected void timestampWhereClause(ExpressionBuilder builder) {
-    builder.append(" WHERE ");
-    coalesceTimestampColumns(builder);
-    builder.append(" > ? AND ");
-    coalesceTimestampColumns(builder);
-    builder.append(" < ? ORDER BY ");
+  protected void timestampWhereClause(ExpressionBuilder builder, boolean first) {
+    if (!first) {
+      builder.append(" WHERE ");
+      coalesceTimestampColumns(builder);
+      builder.append(" > ? AND ");
+      coalesceTimestampColumns(builder);
+      builder.append(" < ?");
+    }
+    builder.append(" ORDER BY ");
     coalesceTimestampColumns(builder);
     builder.append(" ASC");
   }

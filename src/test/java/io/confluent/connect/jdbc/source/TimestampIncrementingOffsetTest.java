@@ -28,8 +28,8 @@ public class TimestampIncrementingOffsetTest {
   private final long id = 1000L;
   private final TimestampIncrementingOffset unset = new TimestampIncrementingOffset(null, null);
   private final TimestampIncrementingOffset tsOnly = new TimestampIncrementingOffset(ts, null);
-  private final TimestampIncrementingOffset incOnly = new TimestampIncrementingOffset(null, id);
-  private final TimestampIncrementingOffset tsInc = new TimestampIncrementingOffset(ts, id);
+  private final TimestampIncrementingOffset incOnly = new TimestampIncrementingOffset(null, IncrementalValue.of(id));
+  private final TimestampIncrementingOffset tsInc = new TimestampIncrementingOffset(ts, IncrementalValue.of(id));
   private Timestamp nanos;
   private TimestampIncrementingOffset nanosOffset;
 
@@ -44,7 +44,7 @@ public class TimestampIncrementingOffsetTest {
 
   @Test
   public void testDefaults() {
-    assertEquals(-1, unset.getIncrementingOffset());
+    assertEquals(IncrementalValue.of(-1L), unset.getIncrementingOffset());
     assertNotNull(unset.getTimestampOffset());
     assertEquals(0, unset.getTimestampOffset().getTime());
     assertEquals(0, unset.getTimestampOffset().getNanos());
@@ -61,11 +61,11 @@ public class TimestampIncrementingOffsetTest {
 
   @Test
   public void testGetIncrementingOffset() {
-    assertEquals(-1, unset.getIncrementingOffset());
-    assertEquals(-1, tsOnly.getIncrementingOffset());
-    assertEquals(id, incOnly.getIncrementingOffset());
-    assertEquals(id, tsInc.getIncrementingOffset());
-    assertEquals(-1, nanosOffset.getIncrementingOffset());
+    assertEquals(-1L, unset.getIncrementingOffset().value());
+    assertEquals(-1L, tsOnly.getIncrementingOffset().value());
+    assertEquals(id, incOnly.getIncrementingOffset().value());
+    assertEquals(id, tsInc.getIncrementingOffset().value());
+    assertEquals(-1L, nanosOffset.getIncrementingOffset().value());
   }
 
   @Test
@@ -94,13 +94,13 @@ public class TimestampIncrementingOffsetTest {
     assertEquals(new TimestampIncrementingOffset(null, null), new TimestampIncrementingOffset(null, null));
     assertEquals(unset, new TimestampIncrementingOffset(null, null));
 
-    TimestampIncrementingOffset x = new TimestampIncrementingOffset(null, id);
+    TimestampIncrementingOffset x = new TimestampIncrementingOffset(null, IncrementalValue.of(id));
     assertEquals(x, incOnly);
 
     x = new TimestampIncrementingOffset(ts, null);
     assertEquals(x, tsOnly);
 
-    x = new TimestampIncrementingOffset(ts, id);
+    x = new TimestampIncrementingOffset(ts, IncrementalValue.of(id));
     assertEquals(x, tsInc);
 
     x = new TimestampIncrementingOffset(nanos, null);

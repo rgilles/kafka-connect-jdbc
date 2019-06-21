@@ -405,7 +405,7 @@ public class JdbcSourceTaskUpdateTest extends JdbcSourceTaskTestBase {
 
   @Test
   public void testManualIncrementingRestoreNoVersionOffset() throws Exception {
-    TimestampIncrementingOffset offset = new TimestampIncrementingOffset(null, 1L);
+    TimestampIncrementingOffset offset = new TimestampIncrementingOffset(null, IncrementalValue.of(1L));
     testManualIncrementingRestoreOffset(
         Collections.singletonMap(SINGLE_TABLE_PARTITION, offset.toMap())
     );
@@ -413,7 +413,7 @@ public class JdbcSourceTaskUpdateTest extends JdbcSourceTaskTestBase {
 
   @Test
   public void testManualIncrementingRestoreVersionOneOffset() throws Exception {
-    TimestampIncrementingOffset offset = new TimestampIncrementingOffset(null, 1L);
+    TimestampIncrementingOffset offset = new TimestampIncrementingOffset(null, IncrementalValue.of(1L));
     testManualIncrementingRestoreOffset(
         Collections.singletonMap(SINGLE_TABLE_PARTITION_WITH_VERSION, offset.toMap())
     );
@@ -421,8 +421,8 @@ public class JdbcSourceTaskUpdateTest extends JdbcSourceTaskTestBase {
 
   @Test
   public void testManualIncrementingRestoreOffsetsWithMultipleProtocol() throws Exception {
-    TimestampIncrementingOffset oldOffset = new TimestampIncrementingOffset(null, 0L);
-    TimestampIncrementingOffset offset = new TimestampIncrementingOffset(null, 1L);
+    TimestampIncrementingOffset oldOffset = new TimestampIncrementingOffset(null, IncrementalValue.of(0L));
+    TimestampIncrementingOffset offset = new TimestampIncrementingOffset(null, IncrementalValue.of(1L));
     Map<Map<String, String>, Map<String, Object>> offsets = new HashMap<>();
     offsets.put(SINGLE_TABLE_PARTITION_WITH_VERSION, offset.toMap());
     offsets.put(SINGLE_TABLE_PARTITION, oldOffset.toMap());
@@ -454,7 +454,7 @@ public class JdbcSourceTaskUpdateTest extends JdbcSourceTaskTestBase {
 
   @Test
   public void testAutoincrementRestoreNoVersionOffset() throws Exception {
-    TimestampIncrementingOffset offset = new TimestampIncrementingOffset(null, 1L);
+    TimestampIncrementingOffset offset = new TimestampIncrementingOffset(null, IncrementalValue.of(1L));
     testAutoincrementRestoreOffset(
         Collections.singletonMap(SINGLE_TABLE_PARTITION, offset.toMap())
     );
@@ -462,7 +462,7 @@ public class JdbcSourceTaskUpdateTest extends JdbcSourceTaskTestBase {
 
   @Test
   public void testAutoincrementRestoreVersionOneOffset() throws Exception {
-    TimestampIncrementingOffset offset = new TimestampIncrementingOffset(null, 1L);
+    TimestampIncrementingOffset offset = new TimestampIncrementingOffset(null, IncrementalValue.of(1L));
     testAutoincrementRestoreOffset(
         Collections.singletonMap(SINGLE_TABLE_PARTITION_WITH_VERSION, offset.toMap())
     );
@@ -470,8 +470,8 @@ public class JdbcSourceTaskUpdateTest extends JdbcSourceTaskTestBase {
 
   @Test
   public void testAutoincrementRestoreOffsetsWithMultipleProtocol() throws Exception {
-    TimestampIncrementingOffset oldOffset = new TimestampIncrementingOffset(null, 0L);
-    TimestampIncrementingOffset offset = new TimestampIncrementingOffset(null, 1L);
+    TimestampIncrementingOffset oldOffset = new TimestampIncrementingOffset(null, IncrementalValue.of(0L));
+    TimestampIncrementingOffset offset = new TimestampIncrementingOffset(null, IncrementalValue.of(1L));
     Map<Map<String, String>, Map<String, Object>> offsets = new HashMap<>();
     offsets.put(SINGLE_TABLE_PARTITION_WITH_VERSION, offset.toMap());
     offsets.put(SINGLE_TABLE_PARTITION, oldOffset.toMap());
@@ -568,7 +568,7 @@ public class JdbcSourceTaskUpdateTest extends JdbcSourceTaskTestBase {
 
   @Test
   public void testTimestampAndIncrementingRestoreNoVersionOffset() throws Exception {
-    TimestampIncrementingOffset offset = new TimestampIncrementingOffset(new Timestamp(10L), 3L);
+    TimestampIncrementingOffset offset = new TimestampIncrementingOffset(new Timestamp(10L), IncrementalValue.of(3L));
     testTimestampAndIncrementingRestoreOffset(
         Collections.singletonMap(SINGLE_TABLE_PARTITION, offset.toMap())
     );
@@ -576,7 +576,7 @@ public class JdbcSourceTaskUpdateTest extends JdbcSourceTaskTestBase {
 
   @Test
   public void testTimestampAndIncrementingRestoreVersionOneOffset() throws Exception {
-    TimestampIncrementingOffset offset = new TimestampIncrementingOffset(new Timestamp(10L), 3L);
+    TimestampIncrementingOffset offset = new TimestampIncrementingOffset(new Timestamp(10L), IncrementalValue.of(3L));
     testTimestampAndIncrementingRestoreOffset(
         Collections.singletonMap(SINGLE_TABLE_PARTITION_WITH_VERSION, offset.toMap())
     );
@@ -584,8 +584,8 @@ public class JdbcSourceTaskUpdateTest extends JdbcSourceTaskTestBase {
 
   @Test
   public void testTimestampAndIncrementingRestoreOffsetsWithMultipleProtocol() throws Exception {
-    TimestampIncrementingOffset oldOffset = new TimestampIncrementingOffset(new Timestamp(10L), 2L);
-    TimestampIncrementingOffset offset = new TimestampIncrementingOffset(new Timestamp(10L), 3L);
+    TimestampIncrementingOffset oldOffset = new TimestampIncrementingOffset(new Timestamp(10L), IncrementalValue.of(2L));
+    TimestampIncrementingOffset offset = new TimestampIncrementingOffset(new Timestamp(10L), IncrementalValue.of(3L));
     Map<Map<String, String>, Map<String, Object>> offsets = new HashMap<>();
     offsets.put(SINGLE_TABLE_PARTITION_WITH_VERSION, offset.toMap());
     offsets.put(SINGLE_TABLE_PARTITION, oldOffset.toMap());
@@ -843,7 +843,7 @@ public class JdbcSourceTaskUpdateTest extends JdbcSourceTaskTestBase {
         }
         case INCREMENTING_OFFSET: {
           TimestampIncrementingOffset offset = TimestampIncrementingOffset.fromMap(record.sourceOffset());
-          extracted = (T) (Long) offset.getIncrementingOffset();
+          extracted = (T) ((LongValue) offset.getIncrementingOffset()).value();
           break;
         }
         case TIMESTAMP_OFFSET: {
@@ -881,7 +881,7 @@ public class JdbcSourceTaskUpdateTest extends JdbcSourceTaskTestBase {
       Object incrementing = ((Struct)record.value()).get("id");
       long incrementingValue = incrementing instanceof Integer ? (long)(Integer)incrementing
                                                                : (Long)incrementing;
-      long offsetValue = TimestampIncrementingOffset.fromMap(record.sourceOffset()).getIncrementingOffset();
+      long offsetValue = ((LongValue)TimestampIncrementingOffset.fromMap(record.sourceOffset()).getIncrementingOffset()).value();
       assertEquals(incrementingValue, offsetValue);
     }
   }

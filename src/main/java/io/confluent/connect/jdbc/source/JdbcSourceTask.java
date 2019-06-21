@@ -329,7 +329,7 @@ public class JdbcSourceTask extends SourceTask {
         log.debug("Returning {} records for {}", results.size(), querier.toString());
         return results;
       } catch (SQLException sqle) {
-        log.error("Failed to run query for table {}: {}", querier.toString(), sqle);
+        log.error("Failed to run query for table {}", querier.toString(), sqle);
         resetAndRequeueHead(querier);
         return null;
       } catch (Throwable t) {

@@ -28,8 +28,9 @@ public class TimestampIncrementingOffset {
   private static final String INCREMENTING_FIELD = "incrementing";
   private static final String TIMESTAMP_FIELD = "timestamp";
   private static final String TIMESTAMP_NANOS_FIELD = "timestamp_nanos";
+  private static final IncrementalValue NULL_VALUE = IncrementalValue.of(-1L);
 
-  private final Long incrementingOffset;
+  private final IncrementalValue incrementingOffset;
   private final Timestamp timestampOffset;
 
   /**
@@ -39,13 +40,13 @@ public class TimestampIncrementingOffset {
    * @param incrementingOffset the incrementing offset.
    *                           If null, {@link #getIncrementingOffset()} will return -1.
    */
-  public TimestampIncrementingOffset(Timestamp timestampOffset, Long incrementingOffset) {
+  public TimestampIncrementingOffset(Timestamp timestampOffset, IncrementalValue incrementingOffset) {
     this.timestampOffset = timestampOffset;
-    this.incrementingOffset = incrementingOffset;
+    this.incrementingOffset = incrementingOffset == null ? NULL_VALUE : incrementingOffset;
   }
 
-  public long getIncrementingOffset() {
-    return incrementingOffset == null ? -1 : incrementingOffset;
+  public IncrementalValue getIncrementingOffset() {
+    return incrementingOffset;
   }
 
   public Timestamp getTimestampOffset() {
@@ -54,8 +55,8 @@ public class TimestampIncrementingOffset {
 
   public Map<String, Object> toMap() {
     Map<String, Object> map = new HashMap<>(3);
-    if (incrementingOffset != null) {
-      map.put(INCREMENTING_FIELD, incrementingOffset);
+    if (incrementingOffset != null && !incrementingOffset.equals(NULL_VALUE)) {
+      map.put(INCREMENTING_FIELD, incrementingOffset.value());
     }
     if (timestampOffset != null) {
       map.put(TIMESTAMP_FIELD, timestampOffset.getTime());
@@ -68,8 +69,7 @@ public class TimestampIncrementingOffset {
     if (map == null || map.isEmpty()) {
       return new TimestampIncrementingOffset(null, null);
     }
-
-    Long incr = (Long) map.get(INCREMENTING_FIELD);
+    IncrementalValue incr = IncrementalValue.of(map.get(INCREMENTING_FIELD));
     Long millis = (Long) map.get(TIMESTAMP_FIELD);
     Timestamp ts = null;
     if (millis != null) {
